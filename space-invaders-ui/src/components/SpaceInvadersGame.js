@@ -3,27 +3,38 @@ import HighScores from './HighScores';
 
 const SpaceInvadersGame = () => {
   const canvasRef = useRef(null);
-  const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const scoreRef = useRef(0);
+  const playerRef = useRef(null);
+  const bulletsRef = useRef([]);
+  const enemiesRef = useRef([]);
+  const animationFrameIdRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    let animationFrameId;
 
-    // Game variables
-    let player = {
+    playerRef.current = {
       x: canvas.width / 2,
       y: canvas.height - 30,
       width: 50,
       height: 20,
-      speed: 5
+      speed: 10  // Increased player speed
     };
 
-    let bullets = [];
-    let enemies = [];
+    const createNewWave = () => {
+      enemiesRef.current = [];
+      for (let i = 0; i < 5; i++) {
+        enemiesRef.current.push({
+          x: Math.random() * (canvas.width - 30),
+          y: 0,
+          width: 30,
+          height: 30,
+          speed: 0.5  // Slower enemy speed
+        });
+      }
+    };
 
-    // Game loop
     const gameLoop = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       updatePlayer();
@@ -33,124 +44,99 @@ const SpaceInvadersGame = () => {
       drawScore();
 
       if (!gameOver) {
-        animationFrameId = requestAnimationFrame(gameLoop);
+        animationFrameIdRef.current = requestAnimationFrame(gameLoop);
       }
     };
 
-    // Update player position
     const updatePlayer = () => {
       ctx.fillStyle = 'green';
-      ctx.fillRect(player.x, player.y, player.width, player.height);
+      ctx.fillRect(playerRef.current.x, playerRef.current.y, playerRef.current.width, playerRef.current.height);
     };
 
-    // Update bullets
     const updateBullets = () => {
-      bullets.forEach((bullet, index) => {
+      bulletsRef.current.forEach((bullet, index) => {
         bullet.y -= 5;
         ctx.fillStyle = 'red';
         ctx.fillRect(bullet.x, bullet.y, 5, 10);
 
         if (bullet.y < 0) {
-          bullets.splice(index, 1);
+          bulletsRef.current.splice(index, 1);
         }
       });
     };
 
-    // Update enemies
     const updateEnemies = () => {
-      if (enemies.length === 0) {
-        for (let i = 0; i < 5; i++) {
-          enemies.push({
-            x: Math.random() * (canvas.width - 30),
-            y: 0,
-            width: 30,
-            height: 30
-          });
-        }
+      if (enemiesRef.current.length === 0) {
+        createNewWave();
       }
 
-      let allEnemiesDestroyed = true;
-      enemies.forEach((enemy, index) => {
-        if (enemy) {
-          allEnemiesDestroyed = false;
-          enemy.y += 1;
-          ctx.fillStyle = 'blue';
-          ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      enemiesRef.current.forEach((enemy, index) => {
+        enemy.y += 1;
+        ctx.fillStyle = 'blue';
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
 
-          if (enemy.y > canvas.height) {
-            setGameOver(true);
-          }
+        if (enemy.y > canvas.height) {
+          setGameOver(true);
         }
       });
-
-      if (allEnemiesDestroyed) {
-        for (let i = 0; i < 5; i++) {
-          enemies.push({
-            x: Math.random() * (canvas.width - 30),
-            y: 0,
-            width: 30,
-            height: 30
-          });
-        }
-      }
     };
 
-    // Check collisions
     const checkCollisions = () => {
-      bullets.forEach((bullet, bulletIndex) => {
-        enemies.forEach((enemy, enemyIndex) => {
+      for (let bulletIndex = bulletsRef.current.length - 1; bulletIndex >= 0; bulletIndex--) {
+        for (let enemyIndex = enemiesRef.current.length - 1; enemyIndex >= 0; enemyIndex--) {
+          const bullet = bulletsRef.current[bulletIndex];
+          const enemy = enemiesRef.current[enemyIndex];
+          
           if (
             bullet.x < enemy.x + enemy.width &&
             bullet.x + 5 > enemy.x &&
             bullet.y < enemy.y + enemy.height &&
             bullet.y + 10 > enemy.y
           ) {
-            bullets.splice(bulletIndex, 1);
-            enemies.splice(enemyIndex, 1);
-            setScore(prevScore => prevScore + 10);
+            bulletsRef.current.splice(bulletIndex, 1);
+            enemiesRef.current.splice(enemyIndex, 1);
+            scoreRef.current += 10;
+            break;
           }
-        });
-      });
+        }
+      }
     };
 
-    // Draw score
     const drawScore = () => {
       ctx.fillStyle = 'white';
       ctx.font = '16px Arial';
-      ctx.fillText(`Score: ${score}`, 8, 20);
+      ctx.fillText(`Score: ${scoreRef.current}`, 8, 20);
     };
 
-    // Key event listeners
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowLeft' && player.x > 0) {
-        player.x -= player.speed;
+      if (e.key === 'ArrowLeft' && playerRef.current.x > 0) {
+        playerRef.current.x -= playerRef.current.speed;
       }
-      if (e.key === 'ArrowRight' && player.x < canvas.width - player.width) {
-        player.x += player.speed;
+      if (e.key === 'ArrowRight' && playerRef.current.x < canvas.width - playerRef.current.width) {
+        playerRef.current.x += playerRef.current.speed;
       }
       if (e.key === ' ') {
-        bullets.push({
-          x: player.x + player.width / 2,
-          y: player.y
+        bulletsRef.current.push({
+          x: playerRef.current.x + playerRef.current.width / 2,
+          y: playerRef.current.y
         });
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-
-    // Start the game loop
     gameLoop();
 
-    // Cleanup
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      cancelAnimationFrame(animationFrameIdRef.current);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [score, gameOver]);
+  }, [gameOver]);
 
   const handleSubmitScore = () => {
     setGameOver(false);
-    setScore(0);
+    scoreRef.current = 0;
+    enemiesRef.current = [];
+    bulletsRef.current = [];
   };
 
   return (
@@ -159,8 +145,8 @@ const SpaceInvadersGame = () => {
       {gameOver && (
         <div className="game-over">
           <h2>Game Over</h2>
-          <p>Your score: {score}</p>
-          <HighScores currentScore={score} onSubmitScore={handleSubmitScore} />
+          <p>Your score: {scoreRef.current}</p>
+          <HighScores currentScore={scoreRef.current} onSubmitScore={handleSubmitScore} />
         </div>
       )}
     </div>
